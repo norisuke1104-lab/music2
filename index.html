@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>音符の名称・長さ当てゲーム【完成版】</title>
+    <title>音符の名称・長さ当てゲーム【最終完成版】</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
@@ -65,12 +65,15 @@
         #score-details { padding: 1em; background-color: #fff; } /* スクショ撮影範囲の背景を白に */
         #final-score { font-size: 2.5em; font-weight: bold; color: var(--incorrect-color); margin: 0.2em 0 0.5em 0; }
         
-        /* ▼▼▼ 正誤表テーブル用のCSS ▼▼▼ */
-        #results-table-container { margin-top: 1.5em; }
-        .results-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
-        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; }
-        .results-table thead { background-color: #f2f2f2; }
+        /* ▼▼▼ 正誤表テーブル用のCSS強化 ▼▼▼ */
+        #results-table-container { margin-top: 1.5em; max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 0.9em; table-layout: fixed; }
+        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+        .results-table thead { background-color: #f2f2f2; position: sticky; top: 0; } /* ヘッダー固定 */
         .results-table th { font-weight: bold; }
+        .results-table td.question-cell { display: flex; align-items: center; justify-content: center; gap: 5px; }
+        .results-table td.question-cell img { height: 30px; vertical-align: middle; } /* 画像のサイズ調整 */
+        .results-table tr.incorrect-row { background-color: #ffe0e0; } /* ミスがあった行の背景色 */
         /* ▲▲▲ ここまで ▲▲▲ */
 
         #result-buttons { display: flex; justify-content: center; gap: 10px; margin-top: 1.5em; }
@@ -145,7 +148,6 @@
             { name: "16分音符",      length: "0.25拍", imageUrl: "zyuurokubuonpu.jpg" }
         ];
 
-        // ▼▼▼ 結果記録用の変数を追加 ▼▼▼
         let shuffledQuestions, currentQuestionIndex, mistakeCount, totalScore, mistakesThisQuestion;
         let selectedName, selectedLength, startTime, timerInterval;
         let selectedLevel = 1;
@@ -178,7 +180,10 @@
         });
 
         screenshotButton.addEventListener('click', () => {
-            html2canvas(scoreDetailsEl).then(canvas => {
+            html2canvas(scoreDetailsEl, {
+                useCORS: true, // 画像の読み込みを許可
+                scale: 2 // 高解像度でキャプチャ（任意）
+            }).then(canvas => {
                 const link = document.createElement("a");
                 link.href = canvas.toDataURL("image/png");
                 link.download = `score-card-level${selectedLevel}.png`;
@@ -191,7 +196,7 @@
             currentQuestionIndex = 0;
             mistakeCount = 0;
             totalScore = 0;
-            resultsData = []; // ▼▼▼ ゲーム開始時に結果データをリセット ▼▼▼
+            resultsData = [];
             
             startScreen.classList.add('hidden');
             quizScreen.classList.remove('hidden');
@@ -206,7 +211,7 @@
             selectedName = null;
             selectedLength = null;
             mistakesThisQuestion = 0;
-            questionStartTime = Date.now(); // ▼▼▼ 問題の開始時間を記録 ▼▼▼
+            questionStartTime = Date.now();
             
             feedbackEl.textContent = '';
             feedbackEl.className = '';
@@ -229,21 +234,23 @@
                 feedbackEl.textContent = "🎉 正解！";
                 feedbackEl.className = 'correct';
                 
-                // ▼▼▼ 問題ごとの結果を記録 ▼▼▼
-                const questionTime = ((Date.now() - questionStartTime) / 1000).toFixed(1);
-                resultsData.push({
-                    number: currentQuestionIndex + 1,
-                    questionText: `${question.name} / ${question.length}`,
-                    mistakes: mistakesThisQuestion,
-                    time: questionTime
-                });
-                // ▲▲▲ ここまで ▲▲▲
-                
                 const questionBaseScore = 100 / NOTES.length;
                 const penalty = 4;
                 const points = Math.max(0, questionBaseScore - (mistakesThisQuestion * penalty));
                 totalScore += points;
                 scoreEl.textContent = `スコア: ${Math.round(totalScore)}`;
+
+                // ▼▼▼ 問題ごとの結果を記録（スコアと画像URLを追加） ▼▼▼
+                const questionTime = ((Date.now() - questionStartTime) / 1000).toFixed(1);
+                resultsData.push({
+                    number: currentQuestionIndex + 1,
+                    questionNote: question, // 問題オブジェクト全体を保存
+                    isCorrect: true,
+                    mistakes: mistakesThisQuestion,
+                    time: questionTime,
+                    score: points // 獲得スコア
+                });
+                // ▲▲▲ ここまで ▲▲▲
 
                 setTimeout(() => {
                     currentQuestionIndex++;
@@ -285,23 +292,30 @@
             generateResultsTable(finalTime);
         }
 
+        // ▼▼▼ 正誤表テーブル生成関数を大幅に強化 ▼▼▼
         function generateResultsTable(finalTime) {
             let tableHTML = `<table class="results-table">
                                 <thead>
                                     <tr>
                                         <th>問題</th>
                                         <th>正解</th>
-                                        <th>結果 (ミス回数)</th>
+                                        <th>結果 (ミス)</th>
+                                        <th>スコア</th>
                                         <th>回答時間</th>
                                     </tr>
                                 </thead>
                                 <tbody>`;
             
             resultsData.forEach(result => {
-                tableHTML += `<tr>
-                                <td>${result.number}</td>
-                                <td>${result.questionText}</td>
-                                <td>正解 (${result.mistakes}回)</td>
+                const rowClass = result.mistakes > 0 ? 'incorrect-row' : ''; // ミスがあったらクラスを追加
+                tableHTML += `<tr class="${rowClass}">
+                                <td class="question-cell">
+                                    ${result.number}. 
+                                    <img src="${result.questionNote.imageUrl}" alt="${result.questionNote.name}">
+                                </td>
+                                <td>${result.questionNote.name} / ${result.questionNote.length}</td>
+                                <td>${result.isCorrect ? '正解' : '不正解'} (${result.mistakes}回)</td>
+                                <td>${Math.round(result.score)}点</td>
                                 <td>${result.time}秒</td>
                               </tr>`;
             });
@@ -333,7 +347,7 @@
                 nameBtn.dataset.value = name;
                 nameBtn.addEventListener('click', () => handleSelection('name', nameBtn));
                 nameChoicesEl.appendChild(nameBtn);
-});
+            });
             
             lengthOptions.forEach(length => {
                 const lengthBtn = document.createElement('button');
