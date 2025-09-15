@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>音符の名称・長さ当てゲーム【完成版】</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <style>
         :root {
             --primary-color: #007bff;
@@ -35,115 +36,49 @@
             text-align: center;
         }
 
-        h1 { color: #4a4a4a; margin-top: 0; }
-        h2 { color: #555; border-bottom: 2px solid #eee; padding-bottom: 0.5em; margin-top: 1.5em;}
+        h1, h2, h3 { color: #4a4a4a; margin-top: 0; }
+        h2 { border-bottom: 2px solid #eee; padding-bottom: 0.5em; margin-top: 1.5em;}
 
-        /* ▼▼▼ スタート画面のCSSを追加 ▼▼▼ */
-        #level-select {
-            display: flex;
-            justify-content: center;
-            gap: 20px;
-            margin-top: 2em;
-        }
-        .level-button {
-            width: 40%;
-            padding: 15px;
-            font-size: 1.2em;
-            color: white;
-            border: none;
-            cursor: pointer;
-            border-radius: 10px;
-            transition: background-color 0.3s;
-        }
+        #level-select { display: flex; justify-content: center; gap: 20px; margin-top: 2em; }
+        .level-button { width: 40%; padding: 15px; font-size: 1.2em; color: white; border: none; cursor: pointer; border-radius: 10px; transition: background-color 0.3s; }
         #level1-button { background-color: #28a745; }
         #level1-button:hover { background-color: #218838; }
         #level2-button { background-color: #dc3545; }
         #level2-button:hover { background-color: #c82333; }
-        /* ▲▲▲ ここまで ▲▲▲ */
 
+        #note-image-container { height: 140px; margin: 0.3em 0; display: flex; justify-content: center; align-items: center; }
+        #note-image { max-height: 100%; max-width: 200px; }
 
-        #note-image-container {
-            height: 140px;
-            margin: 0.3em 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        #note-image {
-            max-height: 100%;
-            max-width: 200px;
-        }
+        .choices { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin: 10px 0; }
 
-        .choices {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr 1fr;
-            gap: 8px;
-            margin: 10px 0;
-        }
+        button { padding: 10px 5px; font-size: 0.9em; border-radius: 8px; border: 1px solid var(--border-color); background-color: var(--light-gray); color: #333; cursor: pointer; transition: all 0.2s; }
+        button:hover { background-color: #e9ecef; border-color: #ccc; }
+        button.selected { background-color: var(--primary-color); color: white; border-color: var(--primary-color); }
 
-        button {
-            padding: 10px 5px;
-            font-size: 0.9em;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background-color: var(--light-gray);
-            color: #333;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        button:hover {
-            background-color: #e9ecef;
-            border-color: #ccc;
-        }
-        button.selected {
-            background-color: var(--primary-color);
-            color: white;
-            border-color: var(--primary-color);
-        }
-
-        #restart-button {
-            width: 60%;
-            padding: 15px;
-            font-size: 1.2em;
-            background-color: var(--primary-color);
-            color: white;
-            border: none;
-        }
-        #restart-button:hover {
-            background-color: #0056b3;
-        }
-
-        #feedback {
-            font-size: 1.5em;
-            font-weight: bold;
-            height: 40px;
-            margin-top: 20px;
-        }
+        #feedback { font-size: 1.5em; font-weight: bold; height: 40px; margin-top: 20px; }
         .correct { color: var(--correct-color); }
         .incorrect { color: var(--incorrect-color); }
 
-        #game-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #555;
-            padding: 0 1em;
-        }
+        #game-info { display: flex; justify-content: space-between; align-items: center; font-size: 1.2em; font-weight: bold; color: #555; padding: 0 1em; }
         
-        #result-stats {
-            text-align: left;
-            display: inline-block;
-            font-size: 1.2em;
-            margin: 1em 0;
-        }
-        #final-score {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: var(--incorrect-color);
-            margin: 0.5em 0;
-        }
+        #result-screen h1 { margin-bottom: 0.5em; }
+        #score-details { padding: 1em; background-color: #fff; } /* スクショ撮影範囲の背景を白に */
+        #final-score { font-size: 2.5em; font-weight: bold; color: var(--incorrect-color); margin: 0.2em 0 0.5em 0; }
+        
+        /* ▼▼▼ 正誤表テーブル用のCSS ▼▼▼ */
+        #results-table-container { margin-top: 1.5em; }
+        .results-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; }
+        .results-table thead { background-color: #f2f2f2; }
+        .results-table th { font-weight: bold; }
+        /* ▲▲▲ ここまで ▲▲▲ */
+
+        #result-buttons { display: flex; justify-content: center; gap: 10px; margin-top: 1.5em; }
+        #restart-button, #screenshot-button { width: 45%; padding: 15px; font-size: 1.2em; color: white; border: none; border-radius: 10px; }
+        #restart-button { background-color: var(--primary-color); }
+        #restart-button:hover { background-color: #0056b3; }
+        #screenshot-button { background-color: #17a2b8; }
+        #screenshot-button:hover { background-color: #138496; }
 
         .hidden { display: none; }
     </style>
@@ -159,6 +94,7 @@
                 <button id="level2-button" class="level-button">レベル 2<br><small>（選択肢がランダム）</small></button>
             </div>
         </div>
+
         <div id="quiz-screen" class="hidden">
             <div id="game-info">
                 <div id="question-number"></div>
@@ -181,12 +117,17 @@
                 </div>
             </div>
         </div>
-
+        
         <div id="result-screen" class="hidden">
-            <h1>🏆 結果発表</h1>
-            <p id="final-score">0点</p>
-            <div id="result-stats"></div>
-            <button id="restart-button">もう一度挑戦する</button>
+            <div id="score-details">
+                <h1>🏆 結果発表</h1>
+                <p id="final-score">0点</p>
+                <div id="results-table-container"></div>
+            </div>
+            <div id="result-buttons">
+                <button id="restart-button">レベル選択に戻る</button>
+                <button id="screenshot-button">📸 スクショ撮影</button>
+            </div>
         </div>
     </div>
 
@@ -204,18 +145,21 @@
             { name: "16分音符",      length: "0.25拍", imageUrl: "zyuurokubuonpu.jpg" }
         ];
 
+        // ▼▼▼ 結果記録用の変数を追加 ▼▼▼
         let shuffledQuestions, currentQuestionIndex, mistakeCount, totalScore, mistakesThisQuestion;
         let selectedName, selectedLength, startTime, timerInterval;
-        let selectedLevel = 1; // ▼▼▼ 選択されたレベルを保存する変数 ▼▼▼
+        let selectedLevel = 1;
+        let resultsData = []; // 問題ごとの結果を保存する配列
+        let questionStartTime = 0; // 各問題の開始時間を記録
 
         const startScreen = document.getElementById('start-screen');
         const quizScreen = document.getElementById('quiz-screen');
         const resultScreen = document.getElementById('result-screen');
-        // ▼▼▼ レベル選択ボタンを取得 ▼▼▼
         const level1Button = document.getElementById('level1-button');
         const level2Button = document.getElementById('level2-button');
         const restartButton = document.getElementById('restart-button');
-        
+        const screenshotButton = document.getElementById('screenshot-button');
+        const scoreDetailsEl = document.getElementById('score-details');
         const questionNumberEl = document.getElementById('question-number');
         const noteImageEl = document.getElementById('note-image');
         const nameChoicesEl = document.getElementById('name-choices');
@@ -223,22 +167,23 @@
         const feedbackEl = document.getElementById('feedback');
         const scoreEl = document.getElementById('current-score');
         const timerEl = document.getElementById('timer');
-        const resultStatsEl = document.getElementById('result-stats');
         const finalScoreEl = document.getElementById('final-score');
+        const resultsTableContainerEl = document.getElementById('results-table-container');
         
-        // ▼▼▼ イベントリスナーを設定 ▼▼▼
-        level1Button.addEventListener('click', () => {
-            selectedLevel = 1;
-            startGame();
-        });
-        level2Button.addEventListener('click', () => {
-            selectedLevel = 2;
-            startGame();
-        });
+        level1Button.addEventListener('click', () => { selectedLevel = 1; startGame(); });
+        level2Button.addEventListener('click', () => { selectedLevel = 2; startGame(); });
         restartButton.addEventListener('click', () => {
-             // 結果画面からスタート画面に戻す
             resultScreen.classList.add('hidden');
             startScreen.classList.remove('hidden');
+        });
+
+        screenshotButton.addEventListener('click', () => {
+            html2canvas(scoreDetailsEl).then(canvas => {
+                const link = document.createElement("a");
+                link.href = canvas.toDataURL("image/png");
+                link.download = `score-card-level${selectedLevel}.png`;
+                link.click();
+            });
         });
 
         function startGame() {
@@ -246,56 +191,27 @@
             currentQuestionIndex = 0;
             mistakeCount = 0;
             totalScore = 0;
+            resultsData = []; // ▼▼▼ ゲーム開始時に結果データをリセット ▼▼▼
             
             startScreen.classList.add('hidden');
-            resultScreen.classList.add('hidden');
             quizScreen.classList.remove('hidden');
             
             startTimer();
             showQuestion();
         }
 
-        // ▼▼▼ 選択肢を生成・表示する関数（レベルによって処理を分ける） ▼▼▼
-        function createChoiceButtons() {
-            nameChoicesEl.innerHTML = '';
-            lengthChoicesEl.innerHTML = '';
-
-            let nameOptions = NOTES.map(note => note.name);
-            let lengthOptions = NOTES.map(note => note.length);
-
-            // レベル2の時だけ選択肢の順番をシャッフル
-            if (selectedLevel === 2) {
-                nameOptions.sort(() => Math.random() - 0.5);
-                lengthOptions.sort(() => Math.random() - 0.5);
-            }
-
-            nameOptions.forEach(name => {
-                const nameBtn = document.createElement('button');
-                nameBtn.textContent = name;
-                nameBtn.dataset.value = name;
-                nameBtn.addEventListener('click', () => handleSelection('name', nameBtn));
-                nameChoicesEl.appendChild(nameBtn);
-            });
-            
-            lengthOptions.forEach(length => {
-                const lengthBtn = document.createElement('button');
-                lengthBtn.textContent = length;
-                lengthBtn.dataset.value = length;
-                lengthBtn.addEventListener('click', () => handleSelection('length', lengthBtn));
-                lengthChoicesEl.appendChild(lengthBtn);
-            });
-        }
+        function createChoiceButtons() { /* ...変更なし... */ } // 省略
 
         function showQuestion() {
             selectedName = null;
             selectedLength = null;
             mistakesThisQuestion = 0;
+            questionStartTime = Date.now(); // ▼▼▼ 問題の開始時間を記録 ▼▼▼
             
             feedbackEl.textContent = '';
             feedbackEl.className = '';
             scoreEl.textContent = `スコア: ${Math.round(totalScore)}`;
             
-            // 毎問、選択肢ボタンを生成し直す
             createChoiceButtons();
 
             const question = shuffledQuestions[currentQuestionIndex];
@@ -305,29 +221,23 @@
             noteImageEl.alt = question.name;
         }
         
-        function handleSelection(type, button) {
-            if (feedbackEl.classList.contains('correct')) return;
-
-            const container = type === 'name' ? nameChoicesEl : lengthChoicesEl;
-            Array.from(container.children).forEach(btn => btn.classList.remove('selected'));
-            button.classList.add('selected');
-
-            if (type === 'name') {
-                selectedName = button.dataset.value;
-            } else {
-                selectedLength = button.dataset.value;
-            }
-
-            if (selectedName && selectedLength) {
-                checkAnswer();
-            }
-        }
+        function handleSelection(type, button) { /* ...変更なし... */ } // 省略
         
         function checkAnswer() {
             const question = shuffledQuestions[currentQuestionIndex];
             if (selectedName === question.name && selectedLength === question.length) {
                 feedbackEl.textContent = "🎉 正解！";
                 feedbackEl.className = 'correct';
+                
+                // ▼▼▼ 問題ごとの結果を記録 ▼▼▼
+                const questionTime = ((Date.now() - questionStartTime) / 1000).toFixed(1);
+                resultsData.push({
+                    number: currentQuestionIndex + 1,
+                    questionText: `${question.name} / ${question.length}`,
+                    mistakes: mistakesThisQuestion,
+                    time: questionTime
+                });
+                // ▲▲▲ ここまで ▲▲▲
                 
                 const questionBaseScore = 100 / NOTES.length;
                 const penalty = 4;
@@ -353,24 +263,14 @@
                 setTimeout(() => {
                     selectedName = null;
                     selectedLength = null;
-                    // 選択状態だけリセット
                     Array.from(nameChoicesEl.children).forEach(btn => btn.classList.remove('selected'));
                     Array.from(lengthChoicesEl.children).forEach(btn => btn.classList.remove('selected'));
-
-                    if(feedbackEl.textContent === "😥 違います！もう一度！") {
-                       feedbackEl.textContent = "";
-                    }
+                    if(feedbackEl.textContent === "😥 違います！もう一度！") { feedbackEl.textContent = ""; }
                 }, 800);
             }
         }
         
-        function startTimer() {
-            startTime = Date.now();
-            timerInterval = setInterval(() => {
-                const elapsedTime = (Date.now() - startTime) / 1000;
-                timerEl.textContent = `タイム: ${elapsedTime.toFixed(1)}秒`;
-            }, 100);
-        }
+        function startTimer() { /* ...変更なし... */ } // 省略
 
         function endGame() {
             clearInterval(timerInterval);
@@ -380,11 +280,92 @@
             resultScreen.classList.remove('hidden');
             
             finalScoreEl.textContent = `${Math.round(totalScore)}点`;
-            resultStatsEl.innerHTML = `
-                <p><strong>レベル:</strong> ${selectedLevel}</p>
-                <p><strong>クリアタイム:</strong> ${finalTime.toFixed(2)}秒</p>
-                <p><strong>間違いの数:</strong> ${mistakeCount}回</p>
-            `;
+            
+            // ▼▼▼ 正誤表テーブルを生成して表示 ▼▼▼
+            generateResultsTable(finalTime);
+        }
+
+        function generateResultsTable(finalTime) {
+            let tableHTML = `<table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>問題</th>
+                                        <th>正解</th>
+                                        <th>結果 (ミス回数)</th>
+                                        <th>回答時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+            
+            resultsData.forEach(result => {
+                tableHTML += `<tr>
+                                <td>${result.number}</td>
+                                <td>${result.questionText}</td>
+                                <td>正解 (${result.mistakes}回)</td>
+                                <td>${result.time}秒</td>
+                              </tr>`;
+            });
+
+            tableHTML += `</tbody></table>`;
+            tableHTML += `<h3>合計: タイム ${finalTime.toFixed(2)}秒 / スコア ${Math.round(totalScore)}点</h3>`;
+
+            resultsTableContainerEl.innerHTML = tableHTML;
+        }
+
+        // ----------------------------------------------------
+        // 省略した関数（変更がないため、スペース節約のために非表示）
+        // ----------------------------------------------------
+        function createChoiceButtons() {
+            nameChoicesEl.innerHTML = '';
+            lengthChoicesEl.innerHTML = '';
+
+            let nameOptions = NOTES.map(note => note.name);
+            let lengthOptions = NOTES.map(note => note.length);
+
+            if (selectedLevel === 2) {
+                nameOptions.sort(() => Math.random() - 0.5);
+                lengthOptions.sort(() => Math.random() - 0.5);
+            }
+
+            nameOptions.forEach(name => {
+                const nameBtn = document.createElement('button');
+                nameBtn.textContent = name;
+                nameBtn.dataset.value = name;
+                nameBtn.addEventListener('click', () => handleSelection('name', nameBtn));
+                nameChoicesEl.appendChild(nameBtn);
+});
+            
+            lengthOptions.forEach(length => {
+                const lengthBtn = document.createElement('button');
+                lengthBtn.textContent = length;
+                lengthBtn.dataset.value = length;
+                lengthBtn.addEventListener('click', () => handleSelection('length', lengthBtn));
+                lengthChoicesEl.appendChild(lengthBtn);
+            });
+        }
+        function handleSelection(type, button) {
+            if (feedbackEl.classList.contains('correct')) return;
+
+            const container = type === 'name' ? nameChoicesEl : lengthChoicesEl;
+            Array.from(container.children).forEach(btn => btn.classList.remove('selected'));
+            button.classList.add('selected');
+
+            if (type === 'name') {
+                selectedName = button.dataset.value;
+            } else {
+                selectedLength = button.dataset.value;
+            }
+
+            if (selectedName && selectedLength) {
+                checkAnswer();
+            }
+        }
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsedTime = (Date.now() - startTime) / 1000;
+                timerEl.textContent = `タイム: ${elapsedTime.toFixed(1)}秒`;
+            }, 100);
         }
     });
     </script>
