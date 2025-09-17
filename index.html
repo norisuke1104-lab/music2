@@ -62,23 +62,21 @@
         #game-info { display: flex; justify-content: space-between; align-items: center; font-size: 1.2em; font-weight: bold; color: #555; padding: 0 1em; }
         
         #result-screen h1 { margin-bottom: 0.5em; }
-        #score-details { padding: 1em; background-color: #fff; }
+        #score-details { padding: 1.5em; background-color: #fff; } /* スクショ撮影範囲の背景を白に & 少し余白を追加 */
         #final-score { font-size: 2.5em; font-weight: bold; color: var(--incorrect-color); margin: 0.2em 0 0.5em 0; }
         
-        /* ▼▼▼ 正誤表テーブル用のCSSからスクロール指定を削除 ▼▼▼ */
         #results-table-container { 
             margin-top: 1.5em; 
             border: 1px solid #ddd; 
             border-radius: 8px; 
         }
         .results-table { width: 100%; border-collapse: collapse; font-size: 0.9em; table-layout: fixed; }
-        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; text-align: center; }
-        .results-table thead { background-color: #f2f2f2; } /* ヘッダー固定を解除 */
+        .results-table th, .results-table td { border: 1px solid #ddd; padding: 8px; text-align: center; vertical-align: middle; }
+        .results-table thead { background-color: #f2f2f2; }
         .results-table th { font-weight: bold; }
-        .results-table td.question-cell { display: flex; align-items: center; justify-content: center; gap: 5px; }
-        .results-table td.question-cell img { height: 30px; vertical-align: middle; }
+        .results-table td.question-cell { display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .results-table td.question-cell img { height: 35px; }
         .results-table tr.incorrect-row { background-color: #ffe0e0; }
-        /* ▲▲▲ ここまで ▲▲▲ */
 
         #result-buttons { display: flex; justify-content: center; gap: 10px; margin-top: 1.5em; }
         #restart-button, #screenshot-button { width: 45%; padding: 15px; font-size: 1.2em; color: white; border: none; border-radius: 10px; }
@@ -111,3 +109,285 @@
             <div id="note-image-container">
                 <img id="note-image" src="" alt="音符">
             </div>
+            <div id="feedback"></div>
+
+            <div id="choices-container">
+                <div class="choice-group">
+                    <h2>名称</h2>
+                    <div class="choices" id="name-choices"></div>
+                </div>
+                <div class="choice-group">
+                    <h2>長さ (4/4拍子)</h2>
+                    <div class="choices" id="length-choices"></div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="result-screen" class="hidden">
+            <div id="score-details">
+                <h1>🏆 結果発表</h1>
+                <p id="final-score">0点</p>
+                <div id="results-table-container"></div>
+            </div>
+            <div id="result-buttons">
+                <button id="restart-button">レベル選択に戻る</button>
+                <button id="screenshot-button">📸 スクショ撮影</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+    
+        const NOTES = [
+            { name: "全音符",        length: "4拍",    imageUrl: "zenonpu.jpg" },
+            { name: "付点2分音符",  length: "3拍",    imageUrl: "huten-nibunonpu.jpg" },
+            { name: "2分音符",       length: "2拍",    imageUrl: "nibunonpu.jpg" },
+            { name: "付点4分音符",  length: "1.5拍",  imageUrl: "huten-yonbuonpu.jpg" },
+            { name: "4分音符",       length: "1拍",    imageUrl: "yonbuonpu.jpg" },
+            { name: "付点8分音符",  length: "0.75拍", imageUrl: "huten-hatibuonpu.jpg" },
+            { name: "8分音符",       length: "0.5拍",  imageUrl: "hatibuonpu.jpg" },
+            { name: "16分音符",      length: "0.25拍", imageUrl: "zyuurokubuonpu.jpg" }
+        ];
+
+        let shuffledQuestions, currentQuestionIndex, mistakeCount, totalScore, mistakesThisQuestion;
+        let selectedName, selectedLength, startTime, timerInterval;
+        let selectedLevel = 1;
+        let resultsData = [];
+        let questionStartTime = 0;
+
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const resultScreen = document.getElementById('result-screen');
+        const level1Button = document.getElementById('level1-button');
+        const level2Button = document.getElementById('level2-button');
+        const restartButton = document.getElementById('restart-button');
+        const screenshotButton = document.getElementById('screenshot-button');
+        const scoreDetailsEl = document.getElementById('score-details');
+        const questionNumberEl = document.getElementById('question-number');
+        const noteImageEl = document.getElementById('note-image');
+        const nameChoicesEl = document.getElementById('name-choices');
+        const lengthChoicesEl = document.getElementById('length-choices');
+        const feedbackEl = document.getElementById('feedback');
+        const scoreEl = document.getElementById('current-score');
+        const timerEl = document.getElementById('timer');
+        const finalScoreEl = document.getElementById('final-score');
+        const resultsTableContainerEl = document.getElementById('results-table-container');
+        
+        level1Button.addEventListener('click', () => { selectedLevel = 1; startGame(); });
+        level2Button.addEventListener('click', () => { selectedLevel = 2; startGame(); });
+        restartButton.addEventListener('click', () => {
+            resultScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        });
+
+        // ▼▼▼ スクショ機能にオプションを追加 ▼▼▼
+        screenshotButton.addEventListener('click', () => {
+            // html2canvasを実行し、scoreDetailsElの範囲を画像化
+            html2canvas(scoreDetailsEl, { 
+                useCORS: true // ローカル画像の読み込みを許可
+            }).then(canvas => {
+                // 作成されたcanvasを画像(PNG)に変換
+                const image = canvas.toDataURL("image/png");
+                
+                // ダウンロード用のリンクを一時的に作成
+                const link = document.createElement("a");
+                link.href = image;
+                link.download = `score-card-level${selectedLevel}.png`; // 保存ファイル名
+                
+                // リンクをクリックしてダウンロードを実行
+                link.click();
+            });
+        });
+        // ▲▲▲ ここまで ▲▲▲
+
+        function startGame() {
+            shuffledQuestions = [...NOTES].sort(() => Math.random() - 0.5);
+            currentQuestionIndex = 0;
+            mistakeCount = 0;
+            totalScore = 0;
+            resultsData = [];
+            
+            startScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            
+            startTimer();
+            showQuestion();
+        }
+
+        function createChoiceButtons() { /* ...変更なし... */ }
+
+        function showQuestion() {
+            selectedName = null;
+            selectedLength = null;
+            mistakesThisQuestion = 0;
+            questionStartTime = Date.now();
+            
+            feedbackEl.textContent = '';
+            feedbackEl.className = '';
+            scoreEl.textContent = `スコア: ${Math.round(totalScore)}`;
+            
+            createChoiceButtons();
+
+            const question = shuffledQuestions[currentQuestionIndex];
+            
+            questionNumberEl.textContent = `第 ${currentQuestionIndex + 1} 問`;
+            noteImageEl.src = question.imageUrl;
+            noteImageEl.alt = question.name;
+        }
+        
+        function handleSelection(type, button) { /* ...変更なし... */ }
+        
+        function checkAnswer() {
+            const question = shuffledQuestions[currentQuestionIndex];
+            if (selectedName === question.name && selectedLength === question.length) {
+                feedbackEl.textContent = "🎉 正解！";
+                feedbackEl.className = 'correct';
+                
+                const questionBaseScore = 100 / NOTES.length;
+                const penalty = 4;
+                const points = Math.max(0, questionBaseScore - (mistakesThisQuestion * penalty));
+                totalScore += points;
+                scoreEl.textContent = `スコア: ${Math.round(totalScore)}`;
+
+                const questionTime = ((Date.now() - questionStartTime) / 1000).toFixed(1);
+                resultsData.push({
+                    number: currentQuestionIndex + 1,
+                    questionNote: question,
+                    isCorrect: true,
+                    mistakes: mistakesThisQuestion,
+                    time: questionTime,
+                    score: points
+                });
+
+                setTimeout(() => {
+                    currentQuestionIndex++;
+                    if (currentQuestionIndex < shuffledQuestions.length) {
+                        showQuestion();
+                    } else {
+                        endGame();
+                    }
+                }, 1200);
+
+            } else {
+                feedbackEl.textContent = "😥 違います！もう一度！";
+                feedbackEl.className = 'incorrect';
+                mistakeCount++;
+                mistakesThisQuestion++;
+                
+                setTimeout(() => {
+                    selectedName = null;
+                    selectedLength = null;
+                    Array.from(nameChoicesEl.children).forEach(btn => btn.classList.remove('selected'));
+                    Array.from(lengthChoicesEl.children).forEach(btn => btn.classList.remove('selected'));
+                    if(feedbackEl.textContent === "😥 違います！もう一度！") { feedbackEl.textContent = ""; }
+                }, 800);
+            }
+        }
+        
+        function startTimer() { /* ...変更なし... */ }
+
+        function endGame() {
+            clearInterval(timerInterval);
+            const finalTime = (Date.now() - startTime) / 1000;
+
+            quizScreen.classList.add('hidden');
+            resultScreen.classList.remove('hidden');
+            
+            finalScoreEl.textContent = `${Math.round(totalScore)}点`;
+            
+            generateResultsTable(finalTime);
+        }
+
+        function generateResultsTable(finalTime) {
+            let tableHTML = `<table class="results-table">
+                                <thead>
+                                    <tr>
+                                        <th>問題</th>
+                                        <th>正解</th>
+                                        <th>結果 (ミス)</th>
+                                        <th>スコア</th>
+                                        <th>回答時間</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+            
+            resultsData.forEach(result => {
+                const rowClass = result.mistakes > 0 ? 'incorrect-row' : '';
+                tableHTML += `<tr class="${rowClass}">
+                                <td class="question-cell">
+                                    ${result.number}. 
+                                    <img src="${result.questionNote.imageUrl}" alt="${result.questionNote.name}">
+                                </td>
+                                <td>${result.questionNote.name} / ${result.questionNote.length}</td>
+                                <td>${result.isCorrect ? '正解' : '不正解'} (${result.mistakes}回)</td>
+                                <td>${Math.round(result.score)}点</td>
+                                <td>${result.time}秒</td>
+                              </tr>`;
+            });
+
+            tableHTML += `</tbody></table>`;
+            tableHTML += `<h3>合計: タイム ${finalTime.toFixed(2)}秒 / スコア ${Math.round(totalScore)}点</h3>`;
+
+            resultsTableContainerEl.innerHTML = tableHTML;
+        }
+
+        // ----------------------------------------------------
+        // 省略した関数（変更がないため、スペース節約のために非表示）
+        // ----------------------------------------------------
+        function createChoiceButtons() {
+            nameChoicesEl.innerHTML = '';
+            lengthChoicesEl.innerHTML = '';
+
+            let nameOptions = NOTES.map(note => note.name);
+            let lengthOptions = NOTES.map(note => note.length);
+
+            if (selectedLevel === 2) {
+                nameOptions.sort(() => Math.random() - 0.5);
+                lengthOptions.sort(() => Math.random() - 0.5);
+            }
+
+            nameOptions.forEach(name => {
+                const nameBtn = document.createElement('button');
+                nameBtn.textContent = name;
+                nameBtn.dataset.value = name;
+                nameBtn.addEventListener('click', () => handleSelection('name', nameBtn));
+                nameChoicesEl.appendChild(nameBtn);
+            });
+            
+            lengthOptions.forEach(length => {
+                const lengthBtn = document.createElement('button');
+                lengthBtn.textContent = length;
+                lengthBtn.dataset.value = length;
+                lengthBtn.addEventListener('click', () => handleSelection('length', lengthBtn));
+                lengthChoicesEl.appendChild(lengthBtn);
+            });
+        }
+        function handleSelection(type, button) {
+            if (feedbackEl.classList.contains('correct')) return;
+
+            const container = type === 'name' ? nameChoicesEl : lengthChoicesEl;
+            Array.from(container.children).forEach(btn => btn.classList.remove('selected'));
+            button.classList.add('selected');
+
+            if (type === 'name') {
+                selectedName = button.dataset.value;
+            } else {
+                selectedLength = button.dataset.value;
+            }
+
+            if (selectedName && selectedLength) {
+                checkAnswer();
+            }
+        }
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                const elapsedTime = (Date.now() - startTime) / 1000;
+                timerEl.textContent = `タイム: ${elapsedTime.toFixed(1)}秒`;
+            }, 100);
+        }
+    });
+    </script>
+</body>
+</html>
